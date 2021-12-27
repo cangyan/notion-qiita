@@ -16,6 +16,9 @@ func ValueOf(s string) Files {
 	item := InnerFiles{}
 
 	item.Name = s
+	if len(s) > 100 {
+		item.Name = s[0:95] + "..."
+	}
 	// item.Type = "external"
 	item.External.Url = s
 

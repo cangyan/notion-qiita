@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/cangyan/notion-qiita/types/date"
@@ -43,6 +44,15 @@ type NotionPageData struct {
 	Children   interface{}            `json:"children,omitempty"`
 }
 
+func (r Resp) GetIds() []string {
+	var ret []string
+	for _, item := range r {
+		ret = append(ret, item.Id)
+	}
+
+	return ret
+}
+
 func (r *RespItem) ToNotionPageData(dbId string) string {
 	var ret NotionPageData
 	ret.Parent.DatabaseId = dbId
@@ -69,7 +79,7 @@ func (r *RespItem) ToNotionPageData(dbId string) string {
 
 func main() {
 	page := 1
-	perPage := 1
+	perPage := 10
 	days := 7
 	stocks := 20
 	var created string
@@ -99,39 +109,11 @@ func main() {
 		stocks, _ = strconv.Atoi(stocksStr)
 	}
 
-	url := fmt.Sprintf("https://qiita.com/api/v2/items?page=%d&per_page=%d&query=created:>%s+stocks:>%d", page, perPage, created, stocks)
-	method := "GET"
-
-	client := &http.Client{}
-	req, err := http.NewRequest(method, url, nil)
-
+	qiitaResp, err := GetArticles(page, perPage, stocks, created, qiitaToken)
 	if err != nil {
-		fmt.Println(err)
 		return
 	}
 
-	if qiitaToken != "" {
-		req.Header.Add("Authorization", "Bearer "+qiitaToken)
-	}
-
-	res, err := client.Do(req)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	defer res.Body.Close()
-
-	body, err := ioutil.ReadAll(res.Body)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-
-	resp := Resp{}
-	err = json.Unmarshal(body, &resp)
-	if err != nil {
-		fmt.Println(err)
-	}
 	// fmt.Println(err, resp)
 	if notionToken == "" {
 		err := fmt.Errorf("notion token not config")
@@ -145,7 +127,86 @@ func main() {
 		return
 	}
 
-	for _, item := range resp {
-		fmt.Println(item.ToNotionPageData(notionQiitaDb))
+	for _, item := range qiitaResp {
+		// fmt.Println(item.ToNotionPageData(notionQiitaDb))
+		err := CreateNotionPage(notionToken, item.ToNotionPageData(notionQiitaDb))
+		if err != nil {
+			fmt.Println(err)
+		}
 	}
+
+	// fmt.Println(qiitaResp.GetIds())
+}
+
+func GetArticles(page, perPage, stocks int, created string, qiitaToken string) (Resp, error) {
+	url := fmt.Sprintf("https://qiita.com/api/v2/items?page=%d&per_page=%d&query=created:>%s+stocks:>%d", page, perPage, created, stocks)
+	method := "GET"
+
+	client := &http.Client{}
+	req, err := http.NewRequest(method, url, nil)
+
+	if err != nil {
+		fmt.Println(err)
+		return nil, err
+	}
+
+	if qiitaToken != "" {
+		req.Header.Add("Authorization", "Bearer "+qiitaToken)
+	}
+
+	res, err := client.Do(req)
+	if err != nil {
+		fmt.Println(err)
+		return nil, err
+	}
+	defer res.Body.Close()
+
+	body, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		fmt.Println(err)
+		return nil, err
+	}
+
+	resp := Resp{}
+	err = json.Unmarshal(body, &resp)
+	if err != nil {
+		fmt.Println(err)
+		return nil, err
+	}
+
+	return resp, nil
+}
+
+func CreateNotionPage(token string, in string) error {
+	url := "https://api.notion.com/v1/pages"
+	method := "POST"
+
+	payload := strings.NewReader(in)
+
+	client := &http.Client{}
+	req, err := http.NewRequest(method, url, payload)
+
+	if err != nil {
+		fmt.Println(err)
+		return err
+	}
+	req.Header.Add("Notion-Version", "2021-08-16")
+	req.Header.Add("Authorization", "Bearer "+token)
+	req.Header.Add("Content-Type", "application/json")
+
+	res, err := client.Do(req)
+	if err != nil {
+		fmt.Println(err)
+		return err
+	}
+	defer res.Body.Close()
+
+	body, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		fmt.Println(err)
+		return err
+	}
+	fmt.Println(string(body))
+
+	return nil
 }
