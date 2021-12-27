@@ -8,6 +8,14 @@ import (
 	"os"
 	"strconv"
 	"time"
+
+	"github.com/cangyan/notion-qiita/types/date"
+	"github.com/cangyan/notion-qiita/types/files"
+	"github.com/cangyan/notion-qiita/types/multi_select"
+	"github.com/cangyan/notion-qiita/types/number"
+	"github.com/cangyan/notion-qiita/types/rich_text"
+	"github.com/cangyan/notion-qiita/types/title"
+	"github.com/cangyan/notion-qiita/types/url"
 )
 
 type Resp []RespItem
@@ -27,14 +35,48 @@ type RespItem struct {
 	} `json:"user,omitempty"`
 }
 
+type NotionPageData struct {
+	Parent struct {
+		DatabaseId string `json:"database_id,omitempty"`
+	} `json:"parent,omitempty"`
+	Properties map[string]interface{} `json:"properties,omitempty"`
+	Children   interface{}            `json:"children,omitempty"`
+}
+
+func (r *RespItem) ToNotionPageData(dbId string) string {
+	var ret NotionPageData
+	ret.Parent.DatabaseId = dbId
+	ret.Properties = make(map[string]interface{})
+	// id
+	{
+		ret.Properties["ID"] = title.ValueOf(r.Id)
+		ret.Properties["标题"] = rich_text.ValueOf(r.Title)
+		ret.Properties["URL地址"] = url.ValueOf(r.Url)
+		var tags []string
+		for _, item := range r.Tags {
+			tags = append(tags, item.Name)
+		}
+		ret.Properties["标签"] = multi_select.ValueOf(tags)
+		ret.Properties["点赞数"] = number.ValueOf(float64(r.LikesCount))
+		ret.Properties["作者名字"] = rich_text.ValueOf(r.User.Id)
+		ret.Properties["作者头像"] = files.ValueOf(r.User.ProfileImageUrl)
+		ret.Properties["创建日期"] = date.ValueOf(r.CreatedAt)
+	}
+
+	b, _ := json.Marshal(ret)
+	return string(b)
+}
+
 func main() {
 	page := 1
-	perPage := 20
+	perPage := 1
 	days := 7
 	stocks := 20
 	var created string
 
 	qiitaToken := os.Getenv("QIITA_TOKEN")
+	notionToken := os.Getenv("NOTION_TOKEN")
+	notionQiitaDb := os.Getenv("NOTION_QIITA_DB")
 	pageStr := os.Getenv("QIITA_PAGE")
 	perPageStr := os.Getenv("QIITA_PERPAGE")
 	daysStr := os.Getenv("QIITA_DAYS")
@@ -87,5 +129,23 @@ func main() {
 
 	resp := Resp{}
 	err = json.Unmarshal(body, &resp)
-	fmt.Println(err, resp)
+	if err != nil {
+		fmt.Println(err)
+	}
+	// fmt.Println(err, resp)
+	if notionToken == "" {
+		err := fmt.Errorf("notion token not config")
+		fmt.Println(err)
+		return
+	}
+
+	if notionQiitaDb == "" {
+		err := fmt.Errorf("notion qiita db not config")
+		fmt.Println(err)
+		return
+	}
+
+	for _, item := range resp {
+		fmt.Println(item.ToNotionPageData(notionQiitaDb))
+	}
 }
