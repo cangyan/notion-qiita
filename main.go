@@ -12,6 +12,7 @@ import (
 
 	"github.com/cangyan/notion-qiita/types/date"
 	"github.com/cangyan/notion-qiita/types/files"
+	"github.com/cangyan/notion-qiita/types/filter_object"
 	"github.com/cangyan/notion-qiita/types/multi_select"
 	"github.com/cangyan/notion-qiita/types/number"
 	"github.com/cangyan/notion-qiita/types/rich_text"
@@ -127,8 +128,17 @@ func main() {
 		return
 	}
 
+	existedIds := FindNotionPageExistedById(notionToken, notionQiitaDb, qiitaResp.GetIds())
+
+	// fmt.Println(existedIds)
+	// fmt.Println(len(existedIds))
+
 	for _, item := range qiitaResp {
 		// fmt.Println(item.ToNotionPageData(notionQiitaDb))
+		if StringInArr(item.Id, existedIds) {
+			fmt.Println(item.Id + "文章已存在")
+			continue
+		}
 		err := CreateNotionPage(notionToken, item.ToNotionPageData(notionQiitaDb))
 		if err != nil {
 			fmt.Println(err)
@@ -136,6 +146,16 @@ func main() {
 	}
 
 	// fmt.Println(qiitaResp.GetIds())
+}
+
+func StringInArr(s string, arr []string) bool {
+	for _, v := range arr {
+		if s == v {
+			return true
+		}
+	}
+
+	return false
 }
 
 func GetArticles(page, perPage, stocks int, created string, qiitaToken string) (Resp, error) {
@@ -201,12 +221,83 @@ func CreateNotionPage(token string, in string) error {
 	}
 	defer res.Body.Close()
 
-	body, err := ioutil.ReadAll(res.Body)
+	_, err = ioutil.ReadAll(res.Body)
 	if err != nil {
 		fmt.Println(err)
 		return err
 	}
-	fmt.Println(string(body))
+	// fmt.Println(string(body))
 
 	return nil
+}
+
+type NotionDatabaseQueryResp struct {
+	Object     string      `json:"object,omitempty"`
+	Results    []Block     `json:"results,omitempty"`
+	NextCursor interface{} `json:"next_cursor,omitempty"`
+	HasMore    bool        `json:"has_more,omitempty"`
+}
+
+type Block struct {
+	Object     string
+	Id         string
+	Properties struct {
+		ID struct {
+			Title []struct {
+				Text struct {
+					Content string
+				}
+			}
+		}
+	}
+}
+
+func (r *NotionDatabaseQueryResp) GetArticleIds() []string {
+	data := make([]string, 0)
+	if len(r.Results) > 0 {
+		for _, item := range r.Results {
+			data = append(data, item.Properties.ID.Title[0].Text.Content)
+		}
+	}
+
+	return data
+}
+
+func FindNotionPageExistedById(token string, dbId string, aIds []string) []string {
+	ret := make([]string, 0)
+	url := fmt.Sprintf("https://api.notion.com/v1/databases/%v/query", dbId)
+	method := "POST"
+
+	payload := strings.NewReader(`{"filter":` + filter_object.GenerateTextOrFilterObject("ID", aIds) + `}`)
+
+	client := &http.Client{}
+	req, err := http.NewRequest(method, url, payload)
+
+	if err != nil {
+		fmt.Println(err)
+		return ret
+	}
+	req.Header.Add("Notion-Version", "2021-08-16")
+	req.Header.Add("Authorization", "Bearer "+token)
+	req.Header.Add("Content-Type", "application/json")
+
+	res, err := client.Do(req)
+	if err != nil {
+		fmt.Println(err)
+		return ret
+	}
+	defer res.Body.Close()
+
+	body, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		fmt.Println(err)
+		return ret
+	}
+
+	// fmt.Println(string(body))
+	resp := NotionDatabaseQueryResp{}
+
+	_ = json.Unmarshal(body, &resp)
+
+	return resp.GetArticleIds()
 }
