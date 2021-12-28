@@ -117,6 +117,8 @@ func main() {
 		return
 	}
 
+	fmt.Println("共获取qiita文章:" + strings.Join(qiitaResp.GetIds(), ",") + " 共: " + fmt.Sprint(len(qiitaResp.GetIds())) + "篇")
+
 	// fmt.Println(err, resp)
 	if notionToken == "" {
 		err := fmt.Errorf("notion token not config")
