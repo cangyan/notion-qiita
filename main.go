@@ -241,24 +241,24 @@ type NotionDatabaseQueryResp struct {
 }
 
 type Block struct {
-	Object     string
-	Id         string
+	Object     string `json:"object,omitempty"`
+	Id         string `json:"id,omitempty"`
 	Properties struct {
 		ID struct {
-			Title []struct {
+			RichText []struct {
 				Text struct {
-					Content string
-				}
-			}
-		}
-	}
+					Content string `json:"content,omitempty"`
+				} `json:"text,omitempty"`
+			} `json:"rich_text,omitempty"`
+		} `json:"id,omitempty"`
+	} `json:"properties,omitempty"`
 }
 
 func (r *NotionDatabaseQueryResp) GetArticleIds() []string {
 	data := make([]string, 0)
 	if len(r.Results) > 0 {
 		for _, item := range r.Results {
-			data = append(data, item.Properties.ID.Title[0].Text.Content)
+			data = append(data, item.Properties.ID.RichText[0].Text.Content)
 		}
 	}
 
