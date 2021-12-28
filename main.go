@@ -110,6 +110,8 @@ func main() {
 		stocks, _ = strconv.Atoi(stocksStr)
 	}
 
+	fmt.Print(page, " ", perPage, " ", stocks, " ", created, " ", qiitaToken)
+	fmt.Println("")
 	qiitaResp, err := GetArticles(page, perPage, stocks, created, qiitaToken)
 	if err != nil {
 		return
