@@ -7,9 +7,9 @@ on:
     - cron: "0 9 * * *"
 
 jobs:
-
-  build:
+  deployment:
     runs-on: ubuntu-latest
+    environment: production
     steps:
     - uses: actions/checkout@v2
 
@@ -19,4 +19,12 @@ jobs:
         go-version: 1.16
 
     - name: Run
+      env:
+        QIITA_TOKEN: ${{ secrets.QIITA_TOKEN }}
+        NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+        NOTION_QIITA_DB: ${{ secrets.NOTION_QIITA_DB }}
+        QIITA_PAGE: ${{ secrets.QIITA_PAGE }}
+        QIITA_PERPAGE: ${{ secrets.QIITA_PERPAGE }}
+        QIITA_DAYS: ${{ secrets.QIITA_DAYS }}
+        QIITA_STOCKS: ${{ secrets.QIITA_STOCKS }}
       run: go run ./main.go
