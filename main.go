@@ -60,8 +60,8 @@ func (r *RespItem) ToNotionPageData(dbId string) string {
 	ret.Properties = make(map[string]interface{})
 	// id
 	{
-		ret.Properties["ID"] = title.ValueOf(r.Id)
-		ret.Properties["标题"] = rich_text.ValueOf(r.Title)
+		ret.Properties["ID"] = rich_text.ValueOf(r.Id)
+		ret.Properties["标题"] = title.ValueOf(r.Title)
 		ret.Properties["URL地址"] = url.ValueOf(r.Url)
 		var tags []string
 		for _, item := range r.Tags {
